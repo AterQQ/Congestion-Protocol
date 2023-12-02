@@ -21,8 +21,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     packet_delays = []
     is_finished = False
     last_key = -1
+
     while is_finished == False:
-        
         messages = []
         acks = {}
         seq_id_tmp = seq_id
@@ -52,8 +52,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 packet_delays.append(end_delay - start_delay)
 
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
-
-                
 
                 if ack_id >= last_key and last_key > -1:
                     # print(ack_id, ack[SEQ_ID_SIZE:])
