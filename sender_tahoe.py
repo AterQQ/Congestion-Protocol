@@ -1,6 +1,10 @@
 import socket
 import time
 
+# Sources:
+# Haroon's 152 Reliable Sender code:
+#   https://github.com/Haroon96/ecs152a-fall-2023/tree/main/week7/code
+
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
@@ -8,8 +12,7 @@ MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 cwnd = 1
 sshthresh = 64
 
-
-with open('send.txt', 'rb') as f:
+with open('file.mp3', 'rb') as f:
     data = f.read()
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
@@ -34,7 +37,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             if data_len < MESSAGE_SIZE:
                 last_key = seq_id_tmp + data_len
                 messages.append((last_key, message))
-                # acks[last_key] = False
                 break
 
             messages.append((seq_id_tmp, message))
@@ -54,7 +56,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
 
                 if ack_id >= last_key and last_key > -1:
-                    # print(ack_id, ack[SEQ_ID_SIZE:])
                     last_message = int.to_bytes(ack_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b''
                     udp_socket.sendto(last_message, ('localhost', 5001))
                     last_ack, _ = udp_socket.recvfrom(PACKET_SIZE)
@@ -63,13 +64,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                     break
             
                 ack_id -= MESSAGE_SIZE
-                print(ack_id, ack[SEQ_ID_SIZE:])
                 acks[ack_id] = True
 
                 if all(acks.values()):
-                    # time.sleep(1)
-                    # print(ack_id, ack[SEQ_ID_SIZE:])
-                    # print(acks)
                     seq_id = ack_id + MESSAGE_SIZE
                     if cwnd < sshthresh:
                         cwnd *= 2
@@ -81,24 +78,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             except socket.timeout:
                 for sid, message in messages:
                     if not acks[sid]:
-                        print(f"ACK {(sid)} is duplicate")
                         udp_socket.sendto(message, ('localhost', 5001))
                         seq_id = sid
                         break
                 sshthresh = cwnd/2
-                print("SSHTHRESH is", sshthresh)
                 cwnd = 1
                 break
-        print("CWND IS", cwnd)
     end_time_tp = time.time()
-    # last_message = int.to_bytes(seq_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b''
     close_connection = int.to_bytes(-1, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
-    
-    # udp_socket.sendto(last_message, ('localhost', 5001))
-    # last_ack, _ = udp_socket.recvfrom(PACKET_SIZE)
-    # fin, _ = udp_socket.recvfrom(PACKET_SIZE)
     
     udp_socket.sendto(close_connection, ('localhost', 5001))
 
-    print(f"throughput: {len(data) / (end_time_tp - start_time_tp)} bytes per second")
-    print(f"average delay per packet: {sum(packet_delays) / len(packet_delays)} seconds")
+    throughput = len(data) / (end_time_tp - start_time_tp)
+    avg_packet_delay = sum(packet_delays) / len(packet_delays)
+
+    print(f"{round(throughput, 2)}, {round(avg_packet_delay, 2)}, {round(throughput/avg_packet_delay, 2)}")
