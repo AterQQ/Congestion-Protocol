@@ -8,9 +8,10 @@ import time
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
+MAX_CWND = 100
 
 cwnd = 1
-sshthresh = 81
+sshthresh = 64
 
 class DuplicateAck(Exception):
     pass
@@ -90,9 +91,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 if all(acks.values()):
                     seq_id = ack_id + MESSAGE_SIZE
                     if cwnd < sshthresh:
-                        cwnd *= 3
+                        cwnd *= 2
+                    elif cwnd > MAX_CWND:
+                        cwnd = int(cwnd*0.7)
                     else:
-                        cwnd += 1
+                        cwnd += 2
                     break
                 
 
@@ -104,7 +107,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         seq_id = sid
                         break
                 sshthresh = 2*cwnd/3
-                cwnd = 10
+                cwnd = int(cwnd*0.5)
+                print("SSH thresh is", sshthresh)
                 break
 
             except DuplicateAck:
@@ -115,9 +119,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         seq_id = sid
                         break
                 sshthresh = 2*cwnd/3
-                cwnd = int(sshthresh) + 3
+                cwnd = int(cwnd*0.7)
                 break
-        print(cwnd)
+        # print(cwnd)
 
     end_time_tp = time.time()
     close_connection = int.to_bytes(-1, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
