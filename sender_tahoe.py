@@ -23,11 +23,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     seq_id = 0
     packet_delays = []
     is_finished = False
+    previous_id = 0
     last_key = -1
 
     while is_finished == False:
         messages = []
         acks = {}
+        start_times = {}
         seq_id_tmp = seq_id
         
         for i in range(cwnd):
@@ -42,9 +44,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             messages.append((seq_id_tmp, message))
             acks[seq_id_tmp] = False
             seq_id_tmp += MESSAGE_SIZE
-        for _, message in messages:
+        for message_id, message in messages:
             start_delay = time.time()
             udp_socket.sendto(message, ('localhost', 5001))
+            start_times[message_id] = start_delay
+        
         
         while True:
             try:
@@ -65,6 +69,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             
                 ack_id -= MESSAGE_SIZE
                 acks[ack_id] = True
+
+                if ack_id != previous_id:
+                    previous_id = ack_id
+                    # print(end_delay - start_times.get(ack_id))
+                    packet_delays.append(end_delay - start_times.get(ack_id))
 
                 if all(acks.values()):
                     seq_id = ack_id + MESSAGE_SIZE
