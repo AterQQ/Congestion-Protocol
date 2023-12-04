@@ -4,9 +4,9 @@ import time
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
-SLIDING_WINDOW_SIZE = 500
+SLIDING_WINDOW_SIZE = 100
 
-with open('send.txt', 'rb') as f:
+with open('file.mp3', 'rb') as f:
     data = f.read()
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
@@ -46,8 +46,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 packet_delays.append(end_delay - start_delay)
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
 
-                if ack_id >= last_key and last_key > -1:
-                    print("last")
+                if ack_id >= last_key > -1:
                     last_message = int.to_bytes(ack_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b''
                     udp_socket.sendto(last_message, ('localhost', 5001))
                     last_ack, _ = udp_socket.recvfrom(PACKET_SIZE)
@@ -75,3 +74,4 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
 print(f"throughput: {len(data) / (end_time_tp - start_time_tp)} bytes per second")
 print(f"average delay per packet: {sum(packet_delays) / len(packet_delays)} seconds")
+print(f'{round((len(data) / (end_time_tp - start_time_tp)) / (sum(packet_delays) / len(packet_delays)), 2)}')

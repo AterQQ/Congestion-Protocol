@@ -5,7 +5,7 @@ PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 
-with open('send.txt', 'rb') as f:
+with open('../congestion_control_ecs152a/docker/file.mp3', 'rb') as f:
     data = f.read()
 
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
@@ -36,7 +36,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
         pointer_id += MESSAGE_SIZE
 
     end_time_tp = time.time()
-    udp_socket.sendto(int.to_bytes(-1, 4, signed=True, byteorder='big'), ('localhost', 5001))
+    close_connection = int.to_bytes(-1, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
+    udp_socket.sendto(close_connection, ('localhost', 5001))
 
-print(f"throughput: {len(data) / (end_time_tp - start_time_tp)} bytes per second")
-print(f"average delay per packet: {sum(packet_delays) / len(packet_delays)} seconds")
+print(f"throughput: {round(len(data) / (end_time_tp - start_time_tp), 2)} bytes per second")
+print(f"average delay per packet: {round(sum(packet_delays) / len(packet_delays), 2)} seconds")
+print(f'{round((len(data) / (end_time_tp - start_time_tp)) / (sum(packet_delays) / len(packet_delays)), 2)}')

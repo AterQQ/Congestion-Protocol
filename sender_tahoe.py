@@ -8,9 +8,10 @@ import time
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
+TIMEOUT_TIME = 1
 
 cwnd = 1
-sshthresh = 64
+sshthresh = 65536
 
 with open('file.mp3', 'rb') as f:
     data = f.read()
@@ -18,7 +19,7 @@ with open('file.mp3', 'rb') as f:
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     start_time_tp = time.time()
     udp_socket.bind(("0.0.0.0", 5000))
-    udp_socket.settimeout(1)
+    udp_socket.settimeout(TIMEOUT_TIME)
     
     seq_id = 0
     packet_delays = []
@@ -26,7 +27,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     previous_id = 0
     last_key = -1
 
-    while is_finished == False:
+    while not is_finished:
         messages = []
         acks = {}
         start_times = {}
@@ -59,7 +60,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
 
-                if ack_id >= last_key and last_key > -1:
+                if ack_id >= last_key > -1:
                     last_message = int.to_bytes(ack_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b''
                     udp_socket.sendto(last_message, ('localhost', 5001))
                     last_ack, _ = udp_socket.recvfrom(PACKET_SIZE)
@@ -71,9 +72,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 acks[ack_id] = True
 
                 if ack_id != previous_id:
+                    print(f"previous: {previous_id}, current: {ack_id}")
                     previous_id = ack_id
-                    # print(end_delay - start_times.get(ack_id))
-                    packet_delays.append(end_delay - start_times.get(ack_id))
+                    start_time = start_times.get(ack_id)
+                    packet_delays.append(end_delay - start_time)
 
                 if all(acks.values()):
                     seq_id = ack_id + MESSAGE_SIZE
@@ -85,11 +87,18 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 
 
             except socket.timeout:
+                print("timeout")
+                TIMEOUT_TIME *= 2
+                udp_socket.settimeout(TIMEOUT_TIME)
+                first = True
                 for sid, message in messages:
-                    if not acks[sid]:
+                    if not acks[sid] and first:
+                        print(f"timeout for sid: {sid}")
                         udp_socket.sendto(message, ('localhost', 5001))
+                        previous_id = sid - MESSAGE_SIZE
+                        first = False
+                    else:
                         seq_id = sid
-                        break
                 sshthresh = cwnd/2
                 cwnd = 1
                 break

@@ -11,7 +11,7 @@ MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 MAX_CWND = 100
 
 cwnd = 1
-sshthresh = 64
+sshthresh = 65536
 
 class DuplicateAck(Exception):
     pass
@@ -31,7 +31,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     previous_id = 0
     duplicate_counter = 1
 
-    while is_finished == False:
+    while not is_finished:
         messages = []
         acks = {}
         start_times = {}
@@ -63,7 +63,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
 
-                if ack_id >= last_key and last_key > -1:
+                if ack_id >= last_key > -1:
                     last_message = int.to_bytes(ack_id, SEQ_ID_SIZE, byteorder='big', signed=True) + b''
                     udp_socket.sendto(last_message, ('localhost', 5001))
                     last_ack, _ = udp_socket.recvfrom(PACKET_SIZE)
@@ -73,6 +73,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             
                 ack_id -= MESSAGE_SIZE
                 acks[ack_id] = True
+
+                print(ack_id)
                 
 
                 # print(ack_id, ack[SEQ_ID_SIZE:])
@@ -92,8 +94,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                     seq_id = ack_id + MESSAGE_SIZE
                     if cwnd < sshthresh:
                         cwnd *= 2
-                    elif cwnd > MAX_CWND:
-                        cwnd = int(cwnd*0.7)
                     else:
                         cwnd += 2
                     break
@@ -106,8 +106,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         udp_socket.sendto(message, ('localhost', 5001))
                         seq_id = sid
                         break
-                sshthresh = 2*cwnd/3
-                cwnd = int(cwnd*0.5)
+                sshthresh = int(cwnd/2)
+                cwnd = 1
                 print("SSH thresh is", sshthresh)
                 break
 
@@ -118,7 +118,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         udp_socket.sendto(message, ('localhost', 5001))
                         seq_id = sid
                         break
-                sshthresh = 2*cwnd/3
+                sshthresh = int(cwnd/2)
                 cwnd = int(cwnd*0.7)
                 break
         # print(cwnd)
