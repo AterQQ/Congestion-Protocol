@@ -11,7 +11,7 @@ MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 MAX_CWND = 100
 
 cwnd = 1
-sshthresh = 65536
+sshthresh = 2 ** 16
 TIMEOUT_TIME = 1
 
 class DuplicateAck(Exception):
@@ -96,12 +96,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                     if cwnd < sshthresh:
                         cwnd *= 2
                     else:
-                        cwnd += 2
+                        cwnd += 1
                     break
                 
 
             except socket.timeout:
                 print("Timeout")
+                TIMEOUT_TIME *= 2
+                udp_socket.settimeout(TIMEOUT_TIME)
                 first = True
                 for sid, message in messages:
                     if not acks[sid] and first:

@@ -11,7 +11,7 @@ MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 TIMEOUT_TIME = 1
 
 cwnd = 1
-sshthresh = 2 ** 16
+sshthresh = 64
 
 with open('file.mp3', 'rb') as f:
     data = f.read()
