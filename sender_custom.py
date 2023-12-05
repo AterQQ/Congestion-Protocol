@@ -12,6 +12,7 @@ MAX_CWND = 100
 
 cwnd = 1
 sshthresh = 65536
+TIMEOUT_TIME = 1
 
 class DuplicateAck(Exception):
     pass
@@ -101,11 +102,15 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
             except socket.timeout:
                 print("Timeout")
+                first = True
                 for sid, message in messages:
-                    if not acks[sid]:
+                    if not acks[sid] and first:
+                        print(f"timeout for sid: {sid}")
                         udp_socket.sendto(message, ('localhost', 5001))
+                        previous_id = sid - MESSAGE_SIZE
+                        first = False
+                    else:
                         seq_id = sid
-                        break
                 sshthresh = int(cwnd/2)
                 cwnd = 1
                 print("SSH thresh is", sshthresh)
