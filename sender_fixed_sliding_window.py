@@ -54,9 +54,12 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                     is_finished = True
                     break
 
-                ack_id -= MESSAGE_SIZE
+                if ack_id != 0:
+                    ack_id -= MESSAGE_SIZE
+
                 print(ack_id, ack[SEQ_ID_SIZE:])
                 acks[ack_id] = True
+
                 window_pointer_id += MESSAGE_SIZE
 
                 if all(acks.values()):
@@ -66,12 +69,13 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 for sid, message in messages:
                     if not acks[sid]:
                         udp_socket.sendto(message, ('localhost', 5001))
+                        break
 
 
     end_time_tp = time.time()
     close_connection = int.to_bytes(-1, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
     udp_socket.sendto(close_connection, ('localhost', 5001))
 
-print(f"throughput: {len(data) / (end_time_tp - start_time_tp)} bytes per second")
-print(f"average delay per packet: {sum(packet_delays) / len(packet_delays)} seconds")
+print(f"throughput: {round(len(data) / (end_time_tp - start_time_tp), 2)} bytes per second")
+print(f"average delay per packet: {round(sum(packet_delays) / len(packet_delays), 2)} seconds")
 print(f'{round((len(data) / (end_time_tp - start_time_tp)) / (sum(packet_delays) / len(packet_delays)), 2)}')

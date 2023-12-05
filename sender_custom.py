@@ -11,7 +11,7 @@ MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
 MAX_CWND = 100
 
 cwnd = 1
-sshthresh = 2 ** 16
+sshthresh = 1
 TIMEOUT_TIME = 1
 
 class DuplicateAck(Exception):
@@ -31,6 +31,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     last_key = -1
     previous_id = 0
     duplicate_counter = 1
+    every_other = 0
 
     while not is_finished:
         messages = []
@@ -93,10 +94,11 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
                 if all(acks.values()):
                     seq_id = ack_id + MESSAGE_SIZE
-                    if cwnd < sshthresh:
-                        cwnd *= 2
-                    else:
+                    if every_other == 20:
                         cwnd += 1
+                        every_other = 0
+                    else:
+                        every_other += 1
                     break
                 
 
@@ -113,20 +115,23 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         first = False
                     else:
                         seq_id = sid
-                sshthresh = int(cwnd/2)
+                sshthresh = 1
                 cwnd = 1
                 print("SSH thresh is", sshthresh)
                 break
 
             except DuplicateAck:
                 print("Dup Ack")
+                first = True
                 for sid, message in messages:
-                    if not acks[sid]:
+                    if not acks[sid] and first:
                         udp_socket.sendto(message, ('localhost', 5001))
+                        first = False
+                    else:
                         seq_id = sid
-                        break
-                sshthresh = int(cwnd/2)
-                cwnd = int(cwnd*0.7)
+
+                sshthresh = 1
+                cwnd = 1
                 break
         # print(cwnd)
 
