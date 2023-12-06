@@ -80,10 +80,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                         start_time = start_times.get(prev_id)
                         packet_delays.append(end_delay - start_time)
                         seq_id += MESSAGE_SIZE
-                        duplicated_ack = 1
+                        duplicated_ack = 0
                     
                 if duplicated_ack == 3:
-                    duplicated_ack = 1
+                    duplicated_ack = 0
                     raise TripleDuplicateAck("3 duplicated ACK detected")
 
                 if all(acks.values()):
