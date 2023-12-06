@@ -15,12 +15,14 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
 
     pointer_id = 0
     packet_delays = []
+
     while pointer_id < len(data):
         message = int.to_bytes(pointer_id, SEQ_ID_SIZE, byteorder='big', signed=True) +\
             data[pointer_id:pointer_id + MESSAGE_SIZE]
 
         start_delay = time.time()
         udp_socket.sendto(message, ('localhost', 5001))
+        
         while True:
             try:
                 ack, _ = udp_socket.recvfrom(PACKET_SIZE)

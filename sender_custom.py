@@ -1,5 +1,6 @@
 import socket
 import time
+import statistics
 
 # Sources:
 # Haroon's 152 Reliable Sender code:
@@ -8,11 +9,9 @@ import time
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
-MAX_CWND = 100
 
 cwnd = 1
-sshthresh = 1
-TIMEOUT_TIME = 1
+timeout_time = 1
 
 class DuplicateAck(Exception):
     pass
@@ -23,21 +22,23 @@ with open('file.mp3', 'rb') as f:
 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     start_time_tp = time.time()
     udp_socket.bind(("0.0.0.0", 5000))
-    udp_socket.settimeout(1)
+    udp_socket.settimeout(timeout_time)
     
     seq_id = 0
+    previous_id = 0
     packet_delays = []
     is_finished = False
     last_key = -1
-    previous_id = 0
-    duplicate_counter = 1
+    start_times = {}
+    duplicate_counter = 0
     every_other = 0
 
     while not is_finished:
         messages = []
         acks = {}
-        start_times = {}
         seq_id_tmp = seq_id
+        timeout_occured = False
+        duplicated_ack_occured = False
         
         for i in range(cwnd):
             
@@ -51,18 +52,17 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
             messages.append((seq_id_tmp, message))
             acks[seq_id_tmp] = False
             seq_id_tmp += MESSAGE_SIZE
+
         for message_id, message in messages:
             start_delay = time.time()
             udp_socket.sendto(message, ('localhost', 5001))
-            start_times[message_id] = start_delay
+            if message_id not in start_times:
+                start_times[message_id] = start_delay
         
         while True:
             try:
                 ack, _ = udp_socket.recvfrom(PACKET_SIZE)
-
                 end_delay = time.time()
-                
-
                 ack_id = int.from_bytes(ack[:SEQ_ID_SIZE], byteorder='big')
 
                 if ack_id >= last_key > -1:
@@ -72,68 +72,60 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                     fin, _ = udp_socket.recvfrom(PACKET_SIZE)
                     is_finished = True
                     break
-            
+
                 ack_id -= MESSAGE_SIZE
+            
+                if ack_id == 0:
+                    previous_id -= MESSAGE_SIZE
+
                 acks[ack_id] = True
-
-                print(ack_id)
-                
-
-                # print(ack_id, ack[SEQ_ID_SIZE:])
 
                 if ack_id == previous_id:
                     duplicate_counter += 1
                 else:
-                    previous_id = ack_id
-                    packet_delays.append(end_delay - start_times.get(ack_id))
-                    duplicate_counter = 1
+                    while ack_id > previous_id:
+                        previous_id += MESSAGE_SIZE
+                        start_time = start_times.get(previous_id)
+                        packet_delays.append(end_delay - start_time)
+                        seq_id += MESSAGE_SIZE
+                        duplicated_ack = 1
 
                 if duplicate_counter == 3:
                     duplicate_counter = 1
                     raise DuplicateAck("Recieved Triple acknowledgement")
 
                 if all(acks.values()):
-                    seq_id = ack_id + MESSAGE_SIZE
-                    if every_other == 20:
-                        cwnd += 1
-                        every_other = 0
-                    else:
-                        every_other += 1
+                    start_times = {}
                     break
                 
 
             except socket.timeout:
-                print("Timeout")
-                TIMEOUT_TIME *= 2
-                udp_socket.settimeout(TIMEOUT_TIME)
-                first = True
+                timeout_time = statistics.mean(packet_delays) + 3*statistics.stdev(packet_delays)
+                udp_socket.settimeout(timeout_time)
+                timeout_occured = True
                 for sid, message in messages:
-                    if not acks[sid] and first:
-                        print(f"timeout for sid: {sid}")
-                        udp_socket.sendto(message, ('localhost', 5001))
-                        previous_id = sid - MESSAGE_SIZE
-                        first = False
-                    else:
+                    if not acks[sid]:
                         seq_id = sid
-                sshthresh = 1
-                cwnd = 1
-                print("SSH thresh is", sshthresh)
+                        break
                 break
 
             except DuplicateAck:
-                print("Dup Ack")
-                first = True
+                duplicated_ack_occured = True
                 for sid, message in messages:
-                    if not acks[sid] and first:
-                        udp_socket.sendto(message, ('localhost', 5001))
-                        first = False
-                    else:
+                    if not acks[sid]:
                         seq_id = sid
-
-                sshthresh = 1
-                cwnd = 1
+                        break
                 break
-        # print(cwnd)
+        if timeout_occured:
+            cwnd = 1
+        elif duplicated_ack_occured:
+            cwnd = cwnd/2
+        else: 
+            if every_other == 20:
+                every_other = 0
+                cwnd += 1
+            else:
+                every_other += 1
 
     end_time_tp = time.time()
     close_connection = int.to_bytes(-1, SEQ_ID_SIZE, byteorder='big', signed=True) + b'==FINACK=='
@@ -143,4 +135,6 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     throughput = len(data) / (end_time_tp - start_time_tp)
     avg_packet_delay = sum(packet_delays) / len(packet_delays)
 
-    print(f"{round(throughput, 2)}, {round(avg_packet_delay, 2)}, {round(throughput/avg_packet_delay, 2)}")
+    print(f"{round(throughput, 2)},")
+    print(f"{round(avg_packet_delay, 2)},")
+    print(f"{round(throughput/avg_packet_delay, 2)}")

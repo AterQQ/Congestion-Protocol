@@ -29,8 +29,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
     start_times = {}
     duplicated_ack = 0
 
-    while not is_finished:
-        
+    while not is_finished:  
         messages = []
         acks = {}
         seq_id_tmp = seq_id

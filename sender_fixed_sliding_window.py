@@ -76,8 +76,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
                 if all(acks.values()):
                     start_times = {}
                     break
+                
             except socket.timeout:
-                print("timeout")
                 for sid, message in messages:
                     if not acks[sid]:
                         window_pointer_id = sid
