@@ -9,7 +9,6 @@ import statistics
 PACKET_SIZE = 1024
 SEQ_ID_SIZE = 4
 MESSAGE_SIZE = PACKET_SIZE - SEQ_ID_SIZE
-# TIMEOUT_TIME = 1
 
 cwnd = 1
 sshthresh = 64
